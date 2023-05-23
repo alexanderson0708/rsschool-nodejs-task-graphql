@@ -3,12 +3,11 @@ import { idParamSchema } from '../../utils/reusedSchemas';
 import { createProfileBodySchema, changeProfileBodySchema } from './schema';
 import type { ProfileEntity } from '../../utils/DB/entities/DBProfiles';
 
-const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
-  fastify
-): Promise<void> => {
-  fastify.get('/', async function (request, reply): Promise<
-    ProfileEntity[]
-  > {});
+
+const plugin: FastifyPluginAsyncJsonSchemaToTs = async (fastify): Promise<void> => {
+  fastify.get('/', async function (request, reply): Promise<ProfileEntity[]> {
+    return await this.db.profiles.findMany()
+  });
 
   fastify.get(
     '/:id',
@@ -17,7 +16,14 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<ProfileEntity> {}
+    async function (request, reply): Promise<ProfileEntity> {
+      const res = await this.db.profiles.findOne(request.id)
+      if (res){
+        return res
+      }else{
+        throw reply.notFound
+      }
+    }
   );
 
   fastify.post(
@@ -27,7 +33,9 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         body: createProfileBodySchema,
       },
     },
-    async function (request, reply): Promise<ProfileEntity> {}
+    async function (request, reply): Promise<ProfileEntity> {
+      return await this.db.profiles.create(request.body)
+    }
   );
 
   fastify.delete(
@@ -37,7 +45,14 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<ProfileEntity> {}
+    async function (request, reply): Promise<ProfileEntity> {
+        const res = await this.db.profiles.delete(request.id)
+        if(res){
+          return res
+        }else {
+          throw reply.notFound()
+        }
+    }
   );
 
   fastify.patch(
@@ -48,7 +63,11 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         params: idParamSchema,
       },
     },
-    async function (request, reply): Promise<ProfileEntity> {}
+    async function (request, reply): Promise<ProfileEntity> {
+      const res = await this.db.profiles.change(request.id, request.body)
+      if (!res) throw reply.notFound()
+      return res
+    }
   );
 };
 
