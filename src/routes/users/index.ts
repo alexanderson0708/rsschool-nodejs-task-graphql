@@ -23,11 +23,11 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.findOne(request.id)
+      const res = await this.db.users.findOne({key:"id", equals:request.params.id})
       if(res){
         return res
       }else {
-        throw reply.notFound()
+        return reply.code(404).send({message:'Not found'})
       }
     }
   );
@@ -40,7 +40,9 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      return await this.db.users.create(request.body)
+      return await fastify.db.users.create(request.body).catch((e:Error)=>{
+        return reply.code(400).send({message:e.message || "Bad Request"})
+      })
     }
   );
 
@@ -52,12 +54,33 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.delete(request.id)
-      if(res){
-        return res
-      }else {
-        throw reply.notFound()
+      try {
+        const {id} = request.params
+        const deleteUser = await fastify.db.users.delete(id)
+        const relatedUsers = await fastify.db.users.findMany({key:'subscribedToUserIds', inArray:id})
+        const relatedPosts = await fastify.db.posts.findMany({key:'userId', equals:id})
+        const relatedProfiles = await fastify.db.profiles.findMany({key:'userId', equals:id})
+
+        for (let user of relatedUsers){
+          const index = user.subscribedToUserIds.findIndex((i)=>i === id)
+          const newArrUsers = [...user.subscribedToUserIds].splice(index,1)
+          await fastify.db.users.change(user.id, {subscribedToUserIds:[...newArrUsers]})
+        }
+
+        for (let post of relatedPosts){
+          await fastify.db.posts.delete(post.id)
+        }
+
+        for (let profile of relatedProfiles){
+          await fastify.db.profiles.delete(profile.id)
+        }
+      
+      return deleteUser
+      } catch (err) {
+        return reply.code(400).send({message:(err as Error)||'Invalid user ids'})
       }
+      
+
     }
   );
 
@@ -70,19 +93,21 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.findOne(request.id)
-      if (res){
-        const {subscribedToUserIds} = res
-        const {id : subscribeId} = request.params
-        if (!subscribedToUserIds.includes(subscribeId)){
-          subscribedToUserIds.push(subscribeId)
-          return this.db.users.change(request.body.userId, {subscribedToUserIds})
+      try{
+        const subscriber = await this.db.users.findOne({key:"id", equals:request.params.id})
+        const user = await this.db.users.findOne({key:"id", equals:request.body.userId})
+        if (subscriber && user){
+          if (user.subscribedToUserIds.includes(request.params.id)) throw new Error('User already subscribed')
+          if (request.params.id === request.body.userId) throw new Error('Error:You can not subscribe to yourself')
+  
+          return await fastify.db.users.change(request.body.userId, {subscribedToUserIds:[...user.subscribedToUserIds, request.params.id]})
         }else{
-          return res
+          throw new Error()
         }
-      }else{
-        throw reply.notFound()
+      }catch(err){
+        return reply.code(400).send({message:(err as Error)||'Invalid user ids'})
       }
+     
     }
   );
 
@@ -95,20 +120,23 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.findOne(request.id)
-      if (res){
-        const {subscribedToUserIds} = res
-        const {id : unsubscribeId} = request.params
-        const index = subscribedToUserIds.findIndex((id)=>id===unsubscribeId)
-        if (index!==-1){
-          subscribedToUserIds.slice(index,1)
-          return this.db.users.change(request.body.userId, {subscribedToUserIds})
+      try{
+        const subscriber = await this.db.users.findOne({key:"id", equals:request.params.id})
+        const user = await this.db.users.findOne({key:"id", equals:request.body.userId})
+        if (subscriber && user){
+          if (!user.subscribedToUserIds.includes(request.params.id)) throw new Error('Not found subscribers')
+
+          const index = user.subscribedToUserIds.findIndex((i)=>i === request.params.id)
+          const newArrSubscribers = [...user.subscribedToUserIds].splice(index,1)
+
+          return await fastify.db.users.change(request.body.userId, {subscribedToUserIds:[...newArrSubscribers]})
         }else{
-          throw reply.badRequest()
+          throw new Error()
         }
-      }else{
-        throw reply.notFound()
+      }catch(err){
+        return reply.code(400).send({message:'Bad Request'})
       }
+     
     }
   );
 
@@ -121,9 +149,9 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.change(request.id, request.body)
-      if (!res) throw reply.notFound()
-      return res
+      return fastify.db.users.change(request.params.id, request.body).catch((e:Error)=>{
+        return reply.code(400).send({message:e.message || "Bad Request"})
+      })
     }
   );
 };
