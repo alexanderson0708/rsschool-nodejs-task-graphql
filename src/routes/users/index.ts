@@ -6,6 +6,8 @@ import {
   subscribeBodySchema,
 } from './schemas';
 import type { UserEntity } from '../../utils/DB/entities/DBUsers';
+import {checkIsValidUUID} from "../profiles";
+import {filter, includes, keyBy} from "lodash";
 // import * as repl from "repl";
 
 const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
@@ -23,11 +25,11 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.findOne({key:"id", equals:request.params.id})
+      const res = await this.db.users.findOne({key:"id", equalsAnyOf:[request.params.id]})
       if(res){
         return res
       }else {
-        return reply.code(404).send({message:'Not found'})
+        throw fastify.httpErrors.notFound()
       }
     }
   );
@@ -56,26 +58,26 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
     async function (request, reply): Promise<UserEntity> {
       try {
         const {id} = request.params
-        const deleteUser = await fastify.db.users.delete(id)
-        const relatedUsers = await fastify.db.users.findMany({key:'subscribedToUserIds', inArray:id})
-        const relatedPosts = await fastify.db.posts.findMany({key:'userId', equals:id})
-        const relatedProfiles = await fastify.db.profiles.findMany({key:'userId', equals:id})
 
+        if(!checkIsValidUUID(id)) throw fastify.httpErrors.badRequest()
+
+        const relatedUsers = await fastify.db.users.findMany({key:'subscribedToUserIds', inArray:id})
         for (let user of relatedUsers){
-          const index = user.subscribedToUserIds.findIndex((i)=>i === id)
-          const newArrUsers = [...user.subscribedToUserIds].splice(index,1)
-          await fastify.db.users.change(user.id, {subscribedToUserIds:[...newArrUsers]})
+          const subscribedToUserIds = filter(user.subscribedToUserIds,(userId) => userId !== id)
+          await fastify.db.users.change(user.id, {subscribedToUserIds})
         }
 
+        const relatedPosts = await fastify.db.posts.findMany({key:'userId', equals:id})
         for (let post of relatedPosts){
           await fastify.db.posts.delete(post.id)
         }
 
+        const relatedProfiles = await fastify.db.profiles.findMany({key:'userId', equals:id})
         for (let profile of relatedProfiles){
           await fastify.db.profiles.delete(profile.id)
         }
-      
-      return deleteUser
+
+        return await fastify.db.users.delete(id)
       } catch (err) {
         return reply.code(400).send({message:(err as Error)||'Invalid user ids'})
       }
@@ -93,20 +95,20 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      try{
-        const subscriber = await this.db.users.findOne({key:"id", equals:request.params.id})
-        const user = await this.db.users.findOne({key:"id", equals:request.body.userId})
-        if (subscriber && user){
-          if (user.subscribedToUserIds.includes(request.params.id)) throw new Error('User already subscribed')
-          if (request.params.id === request.body.userId) throw new Error('Error:You can not subscribe to yourself')
-  
-          return await fastify.db.users.change(request.body.userId, {subscribedToUserIds:[...user.subscribedToUserIds, request.params.id]})
-        }else{
-          throw new Error()
-        }
-      }catch(err){
-        return reply.code(400).send({message:(err as Error)||'Invalid user ids'})
-      }
+      const id = request.params.id
+      const subscribeToUserId = request.body.userId
+
+      if(!checkIsValidUUID(id)||!checkIsValidUUID(subscribeToUserId)) throw fastify.httpErrors.badRequest()
+
+      const users = keyBy(await fastify.db.users.findMany({key:"id", equalsAnyOf: [id, subscribeToUserId]}), id)
+
+      if( !users[id] || !users[subscribeToUserId] ) throw fastify.httpErrors.notFound()
+
+      if( includes(users[subscribeToUserId].subscribedToUserIds, id)) throw fastify.httpErrors.badRequest()
+
+      const subscribedToUserIds = [...users[subscribeToUserId].subscribedToUserIds, id]
+      await fastify.db.users.change(subscribeToUserId, {subscribedToUserIds})
+      return users[id]
      
     }
   );

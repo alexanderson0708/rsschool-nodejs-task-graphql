@@ -17,12 +17,12 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (fastify): Promise<void> 
       },
     },
     async function (request, reply): Promise<ProfileEntity> {
-      const res = await this.db.profiles.findOne({key:"id", equals:request.params.id})
+      const res = await fastify.db.profiles.findOne({key:'id', equals:request.params.id})
       
       if(res){
         return res
       }else {
-        return reply.code(404).send({message:'Not found'})
+        throw fastify.httpErrors.notFound()
       }
     }
   );
@@ -36,13 +36,12 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (fastify): Promise<void> 
     },
     async function (request, reply): Promise<ProfileEntity> {
       try {
-        const memberType = await this.db.memberTypes.findOne({key:"id", equals:request.body.memberTypeId}) 
-        const user = await this.db.users.findOne({key:"id", equals:request.body.memberTypeId}) 
-        const profile = await this.db.profiles.findOne({key:"id", equals:request.body.memberTypeId})
+        const {userId, memberTypeId} = request.body
+        const memberType = await this.db.memberTypes.findOne({key:"id", equals:memberTypeId})
+        const user = await this.db.users.findOne({key:"id", equals:userId})
+        const profile = await this.db.profiles.findOne({key:"userId", equals:userId})
         
-        if(!user) throw new Error ('User does not exist')
-        if(!memberType) throw new Error ('MemberType does not exist')
-        if(profile) throw new Error ('This profile already exist')
+        if(!user || !memberType || profile) throw fastify.httpErrors.badRequest()
         
         return await fastify.db.profiles.create(request.body)
       }
@@ -75,16 +74,19 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (fastify): Promise<void> 
       },
     },
     async function (request, reply): Promise<ProfileEntity> {
+      if (!checkIsValidUUID(request.params.id)){
+        throw fastify.httpErrors.badRequest()
+      }
+      return await this.db.profiles.change(request.params.id, request.body)
       try {
         const {id} = request.params
         const partialParam = request.body
-        if (partialParam.memberTypeId){
-          const memberType = await fastify.db.memberTypes.findOne({key:'id', equals:partialParam.memberTypeId})
-
+        if (id){
+          const memberType = await fastify.db.memberTypes.findOne({key:'id', equals:id})
           if(!memberType) throw new Error ('MemberType does not exist');
-
         }
-        return await fastify.db.profiles.change(id, partialParam);
+        const updateProfile = await this.db.profiles.change(id, partialParam)
+        return updateProfile
       } catch (error) {
         return reply.code(400).send({message:(error as Error).message || "Bad Request"})
       }
@@ -93,3 +95,10 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (fastify): Promise<void> 
 };
 
 export default plugin;
+
+
+export function checkIsValidUUID(str: string) {
+  const regexExp =
+    /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
+  return regexExp.test(str);
+}
