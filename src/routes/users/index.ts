@@ -7,7 +7,7 @@ import {
 } from './schemas';
 import type { UserEntity } from '../../utils/DB/entities/DBUsers';
 import {checkIsValidUUID} from "../profiles";
-import {filter, includes, keyBy} from "lodash";
+import {filter} from "lodash";
 // import * as repl from "repl";
 
 const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
@@ -25,11 +25,12 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const res = await this.db.users.findOne({key:"id", equalsAnyOf:[request.params.id]})
+      const {id} = request.params
+      const res = await this.db.users.findOne({key:"id", equals:id})
       if(res){
         return res
       }else {
-        throw fastify.httpErrors.notFound()
+        return reply.code(404).send({message:'Not Found'})
       }
     }
   );
@@ -42,9 +43,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      return await fastify.db.users.create(request.body).catch((e:Error)=>{
-        return reply.code(400).send({message:e.message || "Bad Request"})
-      })
+      return fastify.db.users.create(request.body as Omit<UserEntity, 'id' | 'subscribedToUserIds'>);
     }
   );
 
@@ -57,7 +56,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
     },
     async function (request, reply): Promise<UserEntity> {
       try {
-        const {id} = request.params
+        const {id} = request.params as {id:string}
 
         if(!checkIsValidUUID(id)) throw fastify.httpErrors.badRequest()
 
@@ -95,21 +94,28 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      const id = request.params.id
-      const subscribeToUserId = request.body.userId
+      try {
+        const { id: subscriberId } = request.params as { id: string };
+        const { userId } = request.body as { userId: string };
 
-      if(!checkIsValidUUID(id)||!checkIsValidUUID(subscribeToUserId)) throw fastify.httpErrors.badRequest()
+        const subscriberUser = await fastify.db.users.findOne({ key: 'id', equals: subscriberId });
+        const user = await fastify.db.users.findOne({ key: 'id', equals: userId });
 
-      const users = keyBy(await fastify.db.users.findMany({key:"id", equalsAnyOf: [id, subscribeToUserId]}), id)
+        if (subscriberUser && user) {
+          if (user.subscribedToUserIds.includes(subscriberId)) throw new Error(`User already subscribed.`);
+          if (subscriberId === userId) throw new Error(`You can't subscribe to yourself.`);
 
-      if( !users[id] || !users[subscribeToUserId] ) throw fastify.httpErrors.notFound()
+          const changedUser = await fastify.db.users.change(userId, {
+            subscribedToUserIds: [...user.subscribedToUserIds, subscriberId],
+          });
 
-      if( includes(users[subscribeToUserId].subscribedToUserIds, id)) throw fastify.httpErrors.badRequest()
-
-      const subscribedToUserIds = [...users[subscribeToUserId].subscribedToUserIds, id]
-      await fastify.db.users.change(subscribeToUserId, {subscribedToUserIds})
-      return users[id]
-     
+          return changedUser;
+        } else {
+          throw new Error();
+        }
+      } catch (error) {
+        return reply.code(400).send({ message: (error as Error).message || 'Invalid user ids.' });
+      }
     }
   );
 
@@ -122,21 +128,27 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<UserEntity> {
-      try{
-        const subscriber = await this.db.users.findOne({key:"id", equals:request.params.id})
-        const user = await this.db.users.findOne({key:"id", equals:request.body.userId})
-        if (subscriber && user){
-          if (!user.subscribedToUserIds.includes(request.params.id)) throw new Error('Not found subscribers')
+      try {
+        const { id: subscriberId } = request.params as { id: string };
+        const { userId } = request.body as { userId: string };
+        const subscriberUser = await fastify.db.users.findOne({ key: 'id', equals: subscriberId });
+        const user = await fastify.db.users.findOne({ key: 'id', equals: userId });
 
-          const index = user.subscribedToUserIds.findIndex((i)=>i === request.params.id)
-          const newArrSubscribers = [...user.subscribedToUserIds].splice(index,1)
+        if (subscriberUser && user) {
+          if (!user.subscribedToUserIds.includes(subscriberId)) throw new Error('Not found subscriber for unsubscribe from follow.');
 
-          return await fastify.db.users.change(request.body.userId, {subscribedToUserIds:[...newArrSubscribers]})
-        }else{
-          throw new Error()
+          const copyIds = [...user.subscribedToUserIds];
+          const index = user.subscribedToUserIds.findIndex((item) => item === subscriberId);
+          copyIds.splice(index, 1);
+
+          const changedUser = await fastify.db.users.change(userId, { subscribedToUserIds: [...copyIds] });
+
+          return changedUser;
+        } else {
+          throw new Error();
         }
-      }catch(err){
-        return reply.code(400).send({message:'Bad Request'})
+      } catch (error) {
+        return reply.code(400).send({ message: (error as Error).message || 'Invalid user ids.' });
       }
      
     }
