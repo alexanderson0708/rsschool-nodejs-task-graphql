@@ -1,7 +1,7 @@
 import * as dataloader from "dataloader"
 import { FastifyInstance } from "fastify"
 
-export const createDataLoaderd = async (fastify:FastifyInstance) => {
+export const createDataLoader = async (fastify:FastifyInstance) => {
   const  getPostsByUserId = async (ids:any) => {
     const posts = await fastify.db.posts.findMany({
       key:'userId',
@@ -10,12 +10,12 @@ export const createDataLoaderd = async (fastify:FastifyInstance) => {
     return ids.map((id:string)=>posts.filter((post)=>post.userId === id))
   }
   
-  const  getProfileByUserId = async (ids:any) => {
+  const  getProfilesByUserId = async (ids:any) => {
     const profile = await fastify.db.profiles.findMany({
       key:'userId',
       equalsAnyOf:ids
     })
-    return ids.map((id:string) => profile.find((profile) => profile.userId === id)||null)
+    return ids.map((id:string) => profile.filter((profile) => profile.userId === id) ?? null)
   }
 
   const  getMemberTypesByUserId = async (ids:any) => {
@@ -23,13 +23,13 @@ export const createDataLoaderd = async (fastify:FastifyInstance) => {
       key:'id',
       equalsAnyOf:ids
     })
-    return ids.map((id:string)=>memberType.filter((memberType)=>memberType.id === id)||null)
+    return ids.map((id:string)=>memberType.filter((memberType)=>memberType.id === id) ?? null)
   }
 
   const postsDataLoader = new dataloader(getPostsByUserId)
-  const profileDataLoader = new dataloader(getProfileByUserId)
-  const memberTypeDataLoader = new dataloader(getMemberTypesByUserId)
+  const profilesDataLoader = new dataloader(getProfilesByUserId)
+  const memberTypesDataLoader = new dataloader(getMemberTypesByUserId)
 
-  return {postsDataLoader, profileDataLoader, memberTypeDataLoader}
+  return {postsDataLoader, profilesDataLoader, memberTypesDataLoader}
 }
 
