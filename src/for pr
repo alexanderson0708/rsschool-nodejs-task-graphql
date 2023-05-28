@@ -1,0 +1,345 @@
+1. Task: https://github.com/AlreadyBored/nodejs-assignments/blob/main/assignments/graphql-service/assignment.md
+2. done/dedline 31.01.2023/31.01.2023
+3. Score 360/360
+   Basic Scope
+  * +72 Task 1: restful endpoints.
+  * +72 Subtasks 2.1-2.7: get gql queries.
+  * +54 Subtasks 2.8-2.11: create gql queries.
+  * +54 Subtasks 2.12-2.17: update gql queries.
+  * +88/88 Task 3: solve n+1 graphql problem - for posts, profiles, memberTypes. There wasn't enough time for the rest
+  * +20 Task 4: limit the complexity of the graphql queries.
+
+
+## Task 1. Test
+![img.png](../img.png)
+
+## Task 2.
+   ### 2.1. Get users, profiles, posts, memberTypes - 4 operations in one query. 
+```scss
+query {
+   users {
+      id        
+   }
+   posts {
+      id
+   }
+   profiles {
+      id
+   }
+   memberTypes {
+      id
+   }
+}
+```
+   ### 2.2. Get user, profile, post, memberType by id - 4 operations in one query.
+```scss
+    query($id: ID!, $postId: ID!, $profileId: ID!, $memberTypeId: String!) {
+    user(id: $id) {
+        id
+    }
+    post(id: $postId) {
+        id
+    }
+    profile(id: $profileId) {
+        id
+    }
+    memberType(id: $memberTypeId) {
+        id
+    }
+}
+```
+#### Variables
+ In this case, you should copy id, postId, profileId, memberTypeId from the previous task (2.1)
+```json
+{
+  "id": "9a021148-e2a6-4c77-a27c-5c3162df8fac",
+  "postId": "c7ad6a46-06a4-4849-ae65-20a57517c7a2",
+  "profileId": "e5757823-c1b1-4ee5-8573-2352ba80d532",
+  "memberTypeId": "basic"
+}
+```
+
+   ### 2.3. Get users with their posts, profiles, memberTypes.
+
+```scss
+query {
+  users {
+    id
+    posts {      
+      id
+    }
+    profiles {
+      id
+    }    
+    memberType {
+      id     
+    }    
+  }
+}
+```
+
+   ### 2.4. Get user by id with his posts, profile, memberType.
+
+```scss
+query($id: ID!) {
+  user(id: $id) {
+    id    
+    posts {
+      id
+    }
+    profiles {
+      id
+    }
+    memberType {
+      id
+    }			
+  }
+}
+```
+
+#### Example for variables 
+
+```json
+{
+  "id": "dc93594d-36ba-46f8-918d-6d32a018d867"
+}
+```
+
+   ### 2.5. Get users with their `userSubscribedTo`, profile.  
+
+```scss
+query {
+  users {
+    id
+    userSubscribedTo {
+      id    
+    }
+    profiles {
+      id
+    }
+  }
+}
+```
+
+   ### 2.6. Get user by id with his `subscribedToUser`, posts.  
+
+```scss
+query($id: ID!) {
+  user(id: $id) {
+    id    
+    subscribedToUser {
+      id
+    }
+    posts {
+      id
+    }    		
+  }
+}
+```
+
+#### Example for variables 
+
+```json
+{
+  "id": "d19a34fd-211e-4c23-97cd-039c335580e2"
+}
+```
+
+   ### 2.7. Get users with their `userSubscribedTo`, `subscribedToUser` (additionally for each user in `userSubscribedTo`, `subscribedToUser` add their `userSubscribedTo`, `subscribedToUser`).   
+
+```scss
+query {
+  users {
+    id
+    userSubscribedTo {
+      id
+      userSubscribedTo { id }
+      subscribedToUser { id }
+    }
+    subscribedToUser {
+      id
+      userSubscribedTo { id }
+      subscribedToUser { id }
+    }    
+  }
+}
+```
+
+   ### 2.8. Create user.  
+
+```scss
+mutation ($userInput: UserCreateType!){
+  userCreate(input: $userInput) {
+    user {
+      id      
+    }
+  }
+}
+```
+
+#### Variables
+
+```json
+{
+  "userInput": {
+    "firstName": "VALERA",
+    "lastName": "CbIH pangoliera",
+    "email": "pango@mail.com"
+  }
+}
+```
+
+   ### 2.9. Create profile.  
+
+```scss
+mutation($profileInput: ProfileCreateType!) {
+  profileCreate(input: $profileInput) {
+    profile {
+      id
+    }
+  }
+}
+```
+
+#### Variables
+````json
+{
+  "profileInput": {
+    "avatar": "https://cloudflare-ipfs.com/ipfs/Qmd3W5DuhgHirLHGVixi6V76LhCkZUz6pnFt5AJBiyvHye/avatar/321.jpg",
+    "sex": "female",
+    "birthday": 473862430598,
+    "country": "USA",
+    "street": "Boyd Harbor",
+    "city": "DuBuqueton",
+    "userId": "506a9f49-55fe-4606-9c56-c2cd96e879e1",
+    "memberTypeId": "basic"
+  }
+}
+````
+
+   ### 2.10. Create post.  
+
+```scss
+mutation($postInput: PostCreateType!) {
+  postCreate(input: $postInput) {
+    post {
+      id     
+    }
+  }
+}
+```
+
+#### Variables
+```json
+{
+  "postInput": {
+    "title": "Great Novell",
+    "content": "Eum autem accusantium est quae quasi dolorum quidem sequi vitae.",
+    "userId": "235724c4-d71a-404e-a370-f91a08a5b04a"
+  }
+}
+```
+
+   ### 2.11. [InputObjectType](https://graphql.org/graphql-js/type/#graphqlinputobjecttype) for DTOs.
+
+   ### 2.12. Update user.  
+
+```scss
+mutation ($userId: ID!, $userInput: UserUpdateType!){
+  userUpdate(id: $userId, input: $userInput) {
+    user {
+      id
+    }
+  }
+}
+```
+#### Variables
+```json
+{
+  "userId": "6ab643d3-b5ea-4818-bc0f-6264f11f2e9b",
+  "userInput": {
+    "firstName": "Valera"
+  }
+}
+```
+
+   ### 2.13. Update profile.  
+```scss
+mutation ($profileId: ID!, $profileInput: ProfileUpdateType!){
+  profileUpdate(id: $profileId, input: $profileInput) {
+    profile {
+      id      
+    }
+  }
+}
+```
+#### Variables
+```json
+{	
+  "profileId": "1507fa16-a062-4c40-9c0a-2898c0432227",
+  "profileInput":{
+    "sex": "female"
+  }
+}
+```
+   ### 2.14. Update post.  
+
+```scss
+mutation ($postId: ID!, $postInput: PostUpdateType!){
+  postUpdate(id: $postId, input: $postInput) {
+    post {
+      id   
+    }
+  }
+}
+```
+
+Variables
+```json
+{
+  "postId": "3bf7d7e6-3de5-49b3-8be9-6077047097bf",
+  "postInput": {
+    "title": "Nicolas"
+  }
+}
+```
+
+   ### 2.15. Update memberType.  
+
+```scss
+mutation ($memberTypeId: String!, $memberTypeInput: MemberTypeUpdateType!){
+  memberTypeUpdate(id: $memberTypeId, input: $memberTypeInput) {
+    memberType {
+      id 
+      discount
+      monthPostsLimit
+    }
+  }
+}
+```
+#### Variables 
+```json
+{	
+  "memberTypeId": "business",
+  "memberTypeInput": {
+    "discount": 100,
+    "monthPostsLimit": 200
+  }
+}
+```
+
+   ### 2.16. Subscribe to; unsubscribe from.  
+
+
+
+
+   ### 2.17. [InputObjectType](https://graphql.org/graphql-js/type/#graphqlinputobjecttype) for DTOs.  
+
+3. Solve `n+1` graphql problem with [dataloader](https://www.npmjs.com/package/dataloader) package in all places where it should be used.  
+   You can use only one "findMany" call per loader to consider this task completed.  
+   It's ok to leave the use of the dataloader even if only one entity was requested. But additionally (no extra score) you can optimize the behavior for such cases => +1 db call is allowed per loader.  
+   3.1. List where the dataloader was used with links to the lines of code (creation in gql context and call in resolver).  
+4. Limit the complexity of the graphql queries by their depth with [graphql-depth-limit](https://www.npmjs.com/package/graphql-depth-limit) package.   
+   4.1. Provide a link to the line of code where it was used.  
+   4.2. Specify a POST body of gql query that ends with an error due to the operation of the rule. Request result should be with `errors` field (and with or without `data:null`) describing the error.  
+

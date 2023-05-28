@@ -15,7 +15,8 @@ export const createDataLoader = async (fastify:FastifyInstance) => {
       key:'userId',
       equalsAnyOf:ids
     })
-    return ids.map((id:string) => profile.filter((profile) => profile.userId === id) ?? null)
+    const res = ids.map((id:string) => profile.find((profile) => profile.userId === id) ?? null)
+    return res
   }
 
   const  getMemberTypesByUserId = async (ids:any) => {

@@ -1,5 +1,5 @@
 import { GraphQLID, GraphQLList, GraphQLObjectType, GraphQLString } from "graphql";
-import { memberType, postType, profileType, userType } from "./basic-types";
+import { memberType, postType, profileType, userType } from "./basic";
 import { FastifyInstance } from "fastify";
 
 
