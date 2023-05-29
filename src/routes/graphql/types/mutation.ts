@@ -1,139 +1,16 @@
 import {
-  GraphQLFloat,
   GraphQLID,
-  GraphQLInputObjectType,
-  GraphQLInt,
-  GraphQLNonNull,
   GraphQLObjectType,
   GraphQLString
 } from "graphql";
-import { memberType, postType, profileType, userType } from "./basic";
 import { FastifyInstance } from "fastify";
 import {UserEntity} from "../../../utils/DB/entities/DBUsers";
 import {ProfileEntity} from "../../../utils/DB/entities/DBProfiles";
 import {PostEntity} from "../../../utils/DB/entities/DBPosts";
 import {MemberTypeEntity} from "../../../utils/DB/entities/DBMemberTypes";
-
-const userPayloadType = new GraphQLObjectType({
-  name:'UserPayload',
-  fields:()=>({
-    user:{type:userType},
-  }),
-})
-
-const userCreateType = new GraphQLInputObjectType({
-  name:'UserCreateType',
-  fields:()=>({
-    firstName:{type: new GraphQLNonNull(GraphQLString)},
-    lastName:{type: new GraphQLNonNull(GraphQLString)},
-    email:{type: new GraphQLNonNull(GraphQLString)}
-  }),
-})
-
-const userUpdateType = new GraphQLInputObjectType({
-  name:'UserUpdateType',
-  fields:()=>({
-    firstName:{type: GraphQLString},
-    lastName:{type: GraphQLString},
-    email:{type: GraphQLString}
-  }),
-})
-
-const subscribeToPayloadType = new GraphQLObjectType({
-  name:'SubscribeToPayload',
-  fields:()=>({
-    user:{type:userType},
-  }),
-})
-
-const unsubscribeFromPayloadType = new GraphQLObjectType({
-  name:'UnsubscribeFromPayload',
-  fields:()=>({
-    user:{type:userType},
-  }),
-})
+import { memberTypePayloadType, memberTypeUpdateType, postCreateType, postPayloadType, postUpdateType, profileCreateType, profilePayloadType, profileUpdateType, subscribeToAndUnsubscribeFromPayloadType, subscribeToPayloadType, unsubscribeFromPayloadType, userCreateType, userPayloadType, userUpdateType } from "./inputTypes";
 
 
-const subscribeToAndUnsubscribeFromPayloadType = new GraphQLInputObjectType({
-  name:'SubscribeToAndUnsubscribeFromPayload',
-  fields:()=>({
-    userId:{type:new GraphQLNonNull(GraphQLID)},
-  }),
-})
-
-const postPayloadType = new GraphQLObjectType({
-  name:'PostPayload',
-  fields:()=>({
-    post:{type:postType},
-  }),
-})
-
-const postCreateType = new GraphQLInputObjectType({
-  name:'PostCreateType',
-  fields:()=>({
-    title:{type: new GraphQLNonNull(GraphQLString)},
-    content:{type: new GraphQLNonNull(GraphQLString)},
-    userId:{type: new GraphQLNonNull(GraphQLID)}
-  }),
-})
-
-const postUpdateType = new GraphQLInputObjectType({
-  name:'PostUpdateType',
-  fields:()=>({
-    title:{type: GraphQLString},
-    content:{type: GraphQLString}
-  }),
-})
-
-const profilePayloadType = new GraphQLObjectType({
-  name:'ProfilePayload',
-  fields:()=>({
-    profile:{type:profileType},
-  }),
-})
-
-const profileCreateType = new GraphQLInputObjectType({
-  name:'ProfileCreateType',
-  fields:()=>({
-    avatar:{type: new GraphQLNonNull(GraphQLString)},
-    sex:{type: new GraphQLNonNull(GraphQLString)},
-    birthday:{type: new GraphQLNonNull(GraphQLFloat)},
-    country:{type: new GraphQLNonNull(GraphQLString)},
-    street:{type: new GraphQLNonNull(GraphQLString)},
-    city:{type: new GraphQLNonNull(GraphQLString)},
-    userId:{type: new GraphQLNonNull(GraphQLID)},
-    memberTypeId:{type: new GraphQLNonNull(GraphQLString)},
-  }),
-})
-
-const profileUpdateType = new GraphQLInputObjectType({
-  name:'ProfileUpdateType',
-  fields:()=>({
-    avatar:{type: GraphQLString},
-    sex:{type: GraphQLString},
-    birthday:{type: GraphQLFloat},
-    country:{type: GraphQLString},
-    street:{type: GraphQLString},
-    city:{type: GraphQLString},
-    memberTypeId:{type: GraphQLString},
-  }),
-})
-
-const memberTypePayloadType = new GraphQLObjectType({
-  name:'MemberTypePayload',
-  fields:()=>({
-    memberType:{type:memberType},
-  }),
-})
-
-
-const memberTypeUpdateType = new GraphQLInputObjectType({
-  name:'MemberTypeUpdateType',
-  fields:()=>({
-    discount:{type: GraphQLInt},
-    monthPostsLimit:{type: GraphQLInt},
-  }),
-})
 
 
 export const mutationType = new GraphQLObjectType({
@@ -245,7 +122,7 @@ export const mutationType = new GraphQLObjectType({
     subscribeTo:{
       type:subscribeToPayloadType,
       args:{
-        id:{type:GraphQLString},
+        id:{type:GraphQLID},
         input: {
           type: subscribeToAndUnsubscribeFromPayloadType
         },
@@ -254,7 +131,7 @@ export const mutationType = new GraphQLObjectType({
         const subscribeToUser = await fastify.db.users.findOne({key:'id', equals:input.userId})
         const subscriber = await fastify.db.users.findOne({key:'id', equals:id})
 
-        if(!subscribeToUser) throw new Error(`User fro subscribe with userId:${input.userId} does not exist`)
+        if(!subscribeToUser) throw new Error(`User for subscribe with userId:${input.userId} does not exist`)
         if(!subscriber) throw new Error(`Subscribing user with id:${id} does not exist`)
         if(subscribeToUser.subscribedToUserIds.includes(id)) throw new Error(`User with id:${id} has already subscribed`)
 
@@ -266,7 +143,7 @@ export const mutationType = new GraphQLObjectType({
     unsubscribeFrom:{
       type:unsubscribeFromPayloadType,
       args:{
-        id:{type:GraphQLString},
+        id:{type:GraphQLID},
         input: {
           type: subscribeToAndUnsubscribeFromPayloadType
         },
